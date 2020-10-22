@@ -1,0 +1,78 @@
+plugins {
+    id 'com.android.application'
+    id 'com.google.gms.google-services'
+}
+
+android {
+    compileSdkVersion 30
+    buildToolsVersion "30.0.1"
+
+    defaultConfig {
+        applicationId "com.wadektech.mraclient"
+        minSdkVersion 24
+        targetSdkVersion 30
+        versionCode 1
+        versionName "1.0"
+
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+}
+
+dependencies {
+
+    implementation 'androidx.appcompat:appcompat:1.2.0'
+    implementation 'com.google.android.material:material:1.2.1'
+    implementation 'androidx.constraintlayout:constraintlayout:2.0.2'
+    implementation 'com.google.firebase:firebase-database:19.5.0'
+    implementation 'com.google.firebase:firebase-storage:19.2.0'
+    implementation 'com.google.firebase:firebase-messaging:20.3.0'
+    implementation 'com.google.firebase:firebase-firestore:21.7.1'
+    implementation 'androidx.wear:wear:1.0.0'
+    testImplementation 'junit:junit:4.+'
+    androidTestImplementation 'androidx.test.ext:junit:1.1.2'
+    androidTestImplementation 'androidx.test.espresso:espresso-core:3.3.0'
+    //glide
+    implementation 'com.github.bumptech.glide:glide:4.11.0'
+    annotationProcessor 'com.github.bumptech.glide:compiler:4.11.0'
+
+    //rxjava
+    implementation 'io.reactivex.rxjava2:rxjava:2.2.16'
+    implementation 'io.reactivex.rxjava2:rxandroid:2.1.1'
+
+    //firebase ui
+    implementation 'com.firebaseui:firebase-ui-auth:6.2.1'
+
+    //Material design
+    implementation 'com.google.android.material:material:1.2.1'
+
+    //ButterKnife
+    implementation 'com.jakewharton:butterknife:10.2.3'
+    annotationProcessor 'com.jakewharton:butterknife-compiler:10.2.3'
+
+    //Dexter
+    implementation 'com.karumi:dexter:6.1.2'
+
+    //location
+    implementation 'com.google.android.gms:play-services-location:17.1.0'
+
+    //Geofire
+    implementation 'com.firebase:geofire-android:3.0.0'
+
+    //circle image view
+    implementation 'de.hdodenhof:circleimageview:3.1.0'
+
+    // logging
+    implementation 'com.jakewharton.timber:timber:4.7.1'
+    compileOnly 'com.google.android.wearable:wearable:2.6.0'
+}
