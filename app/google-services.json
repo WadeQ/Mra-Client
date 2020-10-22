@@ -1,0 +1,40 @@
+{
+  "project_info": {
+    "project_number": "122581972898",
+    "firebase_url": "https://mra-client.firebaseio.com",
+    "project_id": "mra-client",
+    "storage_bucket": "mra-client.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:122581972898:android:1d6a287fc08876b82ea4fb",
+        "android_client_info": {
+          "package_name": "com.wadektech.mraclient"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "122581972898-hn9at1dkm70kp9h184sofuk4ilin1ipv.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB39L-fH8DAJ1oVsOmhToN05slDqQoIECc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "122581972898-hn9at1dkm70kp9h184sofuk4ilin1ipv.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
