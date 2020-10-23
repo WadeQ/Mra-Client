@@ -12,8 +12,14 @@ import android.os.Build;
 
 import androidx.core.app.NotificationCompat;
 
+import com.google.android.gms.maps.model.Marker;
 import com.wadektech.mraclient.R;
+import com.wadektech.mraclient.models.JobSeekerGeolocation;
 import com.wadektech.mraclient.models.MraClient;
+
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Set;
 
 /**
  * Created by WadeQ on 22/10/2020.
@@ -24,7 +30,11 @@ public class Constants {
   public static final String TOKEN_REFERENCE = "ClientToken";
   public static final String NOTIFICATIONS_TITLE = "NotificationsTitle";
   public static final String NOTIFICATION_BODY = "NotificationsBody";
+  public static final String JOB_SEEKER_LOCATION_REFERENCE = "JobSeekerLocation";
+  public static final String JOB_SEEKER_INFO_REFERENCE = "JobSeekerInfo";
   public static MraClient currentUser;
+  public static Set<JobSeekerGeolocation> jobSeekerFound = new HashSet<>();
+  public static HashMap<String, Marker> markerList = new HashMap<>();
 
   public static String userWelcomeBanner() {
     if (Constants.currentUser != null){
@@ -73,4 +83,7 @@ public class Constants {
     }
   }
 
+  public static String buildName(String firstName, String lastName) {
+    return firstName + " " + lastName;
+  }
 }
