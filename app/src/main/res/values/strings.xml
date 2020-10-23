@@ -28,4 +28,7 @@
     <string name="user_rating">0.0</string>
     <string name="user_phone_number">+254712345678</string>
     <string name="sign_out">Sign Out</string>
+    <string name="permission_required">Allow access to location services.</string>
+    <string name="job_seeker_not_found">No Job Seeker found, try requesting again!</string>
+    <string name="no_job_seeker_with_key">No job seeker with available keys found.</string>
 </resources>
