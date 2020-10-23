@@ -4,6 +4,9 @@ import android.content.Context;
 import android.view.View;
 import android.widget.Toast;
 
+import androidx.annotation.NonNull;
+
+import com.google.android.gms.tasks.OnFailureListener;
 import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.android.material.snackbar.Snackbar;
 import com.google.firebase.auth.FirebaseAuth;
@@ -11,6 +14,8 @@ import com.google.firebase.database.FirebaseDatabase;
 import com.wadektech.mraclient.models.Token;
 import java.util.Map;
 import java.util.Objects;
+
+import timber.log.Timber;
 
 /**
  * Created by WadeQ on 22/10/2020.
@@ -29,19 +34,21 @@ public class MraClientUtils {
   }
 
   public static void updateToken(Context context, String token) {
-    Token userToken = new Token();
+    Token userToken = new Token(token);
     FirebaseDatabase
         .getInstance()
         .getReference(Constants.TOKEN_REFERENCE)
         .child(Objects.requireNonNull(FirebaseAuth.getInstance().getCurrentUser()).getUid())
         .setValue(userToken)
-        .addOnFailureListener(e ->
-            Toast.makeText(context, "Error saving token "+e.getMessage(),Toast.LENGTH_SHORT)
-                .show()).addOnSuccessListener(new OnSuccessListener<Void>() {
-      @Override
-      public void onSuccess(Void aVoid) {
+        .addOnFailureListener(new OnFailureListener() {
+          @Override
+          public void onFailure(@NonNull Exception e) {
+            Timber.e("Error saving token %s", e.getMessage());
+            Toast.makeText(context, "Error saving token " + e.getMessage(), Toast.LENGTH_SHORT)
+                .show();
+          }
+        }).addOnSuccessListener(aVoid -> {
 
-      }
-    });
+                });
   }
 }

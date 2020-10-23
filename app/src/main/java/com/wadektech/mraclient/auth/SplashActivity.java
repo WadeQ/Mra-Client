@@ -18,6 +18,7 @@ import android.widget.Toast;
 import com.firebase.ui.auth.AuthMethodPickerLayout;
 import com.firebase.ui.auth.AuthUI;
 import com.firebase.ui.auth.IdpResponse;
+import com.google.android.gms.tasks.OnFailureListener;
 import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.android.material.textfield.TextInputEditText;
 import com.google.firebase.auth.FirebaseAuth;
@@ -79,14 +80,18 @@ public class SplashActivity extends AppCompatActivity {
         FirebaseInstanceId
             .getInstance()
             .getInstanceId()
-            .addOnFailureListener(e -> Toast.makeText(SplashActivity.this, e.getMessage(),
-                Toast.LENGTH_SHORT).show()).addOnSuccessListener(new OnSuccessListener<InstanceIdResult>() {
-          @Override
-          public void onSuccess(InstanceIdResult instanceIdResult) {
-            Timber.e("Saved token %s", instanceIdResult.getToken());
-            MraClientUtils.updateToken(SplashActivity.this, instanceIdResult.getToken());
-          }
-        });
+            .addOnFailureListener(new OnFailureListener() {
+              @Override
+              public void onFailure(@NonNull Exception e) {
+                Timber.e("Error saving token %s", e.getMessage());
+                Toast.makeText(SplashActivity.this, e.getMessage(),
+                    Toast.LENGTH_SHORT).show();
+              }
+            })
+            .addOnSuccessListener(instanceIdResult -> {
+                  Timber.e("Saved token %s", instanceIdResult.getToken());
+                  MraClientUtils.updateToken(SplashActivity.this, instanceIdResult.getToken());
+                });
         signInReturningUser();
 
       } else {
