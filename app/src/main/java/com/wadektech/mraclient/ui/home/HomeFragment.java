@@ -1,6 +1,7 @@
 package com.wadektech.mraclient.ui.home;
 
 import android.Manifest;
+import android.animation.ValueAnimator;
 import android.annotation.SuppressLint;
 import android.content.pm.PackageManager;
 import android.content.res.Resources;
@@ -8,6 +9,7 @@ import android.location.Address;
 import android.location.Geocoder;
 import android.location.Location;
 import android.os.Bundle;
+import android.os.Handler;
 import android.os.Looper;
 import android.security.keystore.UserNotAuthenticatedException;
 import android.text.TextUtils;
@@ -15,6 +17,7 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.animation.LinearInterpolator;
 import android.widget.RelativeLayout;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -42,6 +45,7 @@ import com.google.android.gms.maps.SupportMapFragment;
 import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.MapStyleOptions;
+import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.android.gms.tasks.OnFailureListener;
 import com.google.android.gms.tasks.OnSuccessListener;
@@ -65,7 +69,13 @@ import com.wadektech.mraclient.callbacks.IFirebaseJobSeekerInfoListener;
 import com.wadektech.mraclient.models.GeoQueryClass;
 import com.wadektech.mraclient.models.JobSeekerGeolocation;
 import com.wadektech.mraclient.models.JobSeekerInfo;
+import com.wadektech.mraclient.models.LocationAnimation;
+import com.wadektech.mraclient.remote.IGoogleAPI;
+import com.wadektech.mraclient.remote.RetrofitClient;
 import com.wadektech.mraclient.utils.Constants;
+
+import org.json.JSONArray;
+import org.json.JSONObject;
 
 import java.io.IOException;
 import java.util.List;
@@ -75,10 +85,12 @@ import java.util.Objects;
 import io.reactivex.Observable;
 import io.reactivex.Scheduler;
 import io.reactivex.android.schedulers.AndroidSchedulers;
+import io.reactivex.disposables.CompositeDisposable;
 import io.reactivex.schedulers.Schedulers;
 import timber.log.Timber;
 
-public class HomeFragment extends Fragment implements OnMapReadyCallback, IFirebaseFailedListener, IFirebaseJobSeekerInfoListener {
+public class HomeFragment extends Fragment implements OnMapReadyCallback, IFirebaseFailedListener,
+    IFirebaseJobSeekerInfoListener {
   HomeViewModel homeViewModel;
   GoogleMap mMap;
   SupportMapFragment mapFragment;
@@ -93,6 +105,22 @@ public class HomeFragment extends Fragment implements OnMapReadyCallback, IFireb
   IFirebaseJobSeekerInfoListener iFirebaseJobSeekerInfoListener;
   IFirebaseFailedListener iFirebaseFailedListener;
   boolean firstTime = true;
+  CompositeDisposable compositeDisposable = new CompositeDisposable();
+  private IGoogleAPI iGoogleAPI ;
+
+  //moving marker attribs
+  private List<LatLng> polyLineList ;
+  private Handler handler;
+  private int index, next;
+  private LatLng start , end;
+  private float v ;
+  private double lat, lng ;
+
+  @Override
+  public void onStop() {
+    compositeDisposable.clear();
+    super.onStop();
+  }
 
   ValueEventListener onlineStatusValueEventListener = new ValueEventListener() {
     @Override
@@ -125,6 +153,7 @@ public class HomeFragment extends Fragment implements OnMapReadyCallback, IFireb
 
   @SuppressLint("MissingPermission")
   private void initLocation() {
+    iGoogleAPI = RetrofitClient.getInstance().create(IGoogleAPI.class);
     iFirebaseFailedListener = this;
     iFirebaseJobSeekerInfoListener = this;
     onlineStatusRef = FirebaseDatabase.getInstance().getReference().child(".info/connected");
@@ -163,7 +192,6 @@ public class HomeFragment extends Fragment implements OnMapReadyCallback, IFireb
         } else {
           //TO-DO
         }
-
 
         geoFire.setLocation(FirebaseAuth.getInstance().getCurrentUser().getUid(),
             new GeoLocation(locationResult.getLastLocation().getLatitude(),
@@ -427,9 +455,39 @@ public class HomeFragment extends Fragment implements OnMapReadyCallback, IFireb
         @Override
         public void onDataChange(@NonNull DataSnapshot snapshot) {
           if (!snapshot.hasChildren()){
-            if (Constants.markerList.get(jobSeekerGeolocation.getKey())!=null)
+            if (Constants.markerList.get(jobSeekerGeolocation.getKey())!=null){
+              //Remove marker
               Objects.requireNonNull(Constants.markerList.get(jobSeekerGeolocation.getKey())).remove();
-            databaseReference.removeEventListener(this);
+              //Remove marker info from hash map
+              Constants.markerList.remove(jobSeekerGeolocation.getKey());
+              //Remove job seeker info too
+              Constants.jobSeekerLocationSubscribe.remove(jobSeekerGeolocation.getKey());
+              databaseReference.removeEventListener(this);
+
+            }else {
+              if (Constants.markerList.get(jobSeekerGeolocation.getKey())!=null){
+                GeoQueryClass geoQuery = snapshot.getValue(GeoQueryClass.class);
+                LocationAnimation locationAnimation = new LocationAnimation(false,geoQuery);
+                if (Constants.jobSeekerLocationSubscribe.get(jobSeekerGeolocation.getKey())!= null){
+                  Marker marker = Constants.markerList.get(jobSeekerGeolocation.getKey());
+                  LocationAnimation oldPosition = Constants
+                      .jobSeekerLocationSubscribe
+                      .get(jobSeekerGeolocation.getKey());
+                  assert oldPosition != null;
+                  String from = oldPosition.getGeoQueryClass().getArrayList().get(0) +
+                      "," +
+                      oldPosition.getGeoQueryClass().getArrayList().get(1);
+
+                  String to = locationAnimation.getGeoQueryClass().getArrayList().get(0) +
+                      "," +
+                      locationAnimation.getGeoQueryClass().getArrayList().get(1);
+
+                  moveMarkerAnimation(jobSeekerGeolocation.getKey(),locationAnimation,marker,from,to);
+                } else {
+                  Constants.jobSeekerLocationSubscribe.put(jobSeekerGeolocation.getKey(),locationAnimation);
+                }
+              }
+            }
           }
         }
 
@@ -438,6 +496,81 @@ public class HomeFragment extends Fragment implements OnMapReadyCallback, IFireb
           Snackbar.make(requireView(), error.getMessage(), Snackbar.LENGTH_SHORT).show();
         }
       });
+    }
+  }
+
+  private void moveMarkerAnimation(String key, LocationAnimation locationAnimation, Marker marker,
+                                   String from, String to) {
+    if (!locationAnimation.isRun()){
+      //Request api
+      compositeDisposable.add(iGoogleAPI.getDirections(
+          "Moving",
+          "less_moving",
+          from, to,
+          getString(R.string.google_api_key))
+          .subscribeOn(Schedulers.io())
+          .observeOn(AndroidSchedulers.mainThread())
+          .subscribe(returnResult ->{
+            Timber.d("API Return%s", returnResult);
+            try {
+              //parse JSON
+              JSONObject jsonObject = new JSONObject(returnResult);
+              JSONArray jsonArray = jsonObject.getJSONArray("routes");
+              for (int i = 0; i < jsonArray.length(); i++){
+                JSONObject route = jsonArray.getJSONObject(i);
+                JSONObject poly = route.getJSONObject("overview_polyline");
+                String polyLine = poly.getString("points");
+                polyLineList = Constants.decodePoly(polyLine);
+              }
+
+              //moving
+              handler = new Handler();
+              index = -1 ;
+              next = 1;
+              Runnable runnable = () -> {
+                if (polyLineList.size() > 1){
+                  if (index < polyLineList.size() - 2){
+                    index++;
+                    next = index + 1 ;
+                    start = polyLineList.get(index);
+                    end = polyLineList.get(next);
+                  }
+
+                  ValueAnimator valueAnimator = ValueAnimator.ofInt(0,1);
+                  valueAnimator.setDuration(3000);
+                  valueAnimator.setInterpolator(new LinearInterpolator());
+                  valueAnimator.addUpdateListener(animation -> {
+                    v = animation.getAnimatedFraction();
+                    lat = v*end.latitude + (1-v) * start.latitude;
+                    lng = v*end.longitude + (1-v) * start.longitude;
+                    LatLng newPos = new LatLng(lat,lng);
+                    marker.setPosition(newPos);
+                    marker.setAnchor(0.5f,0.5f);
+                    marker.setRotation(Constants.getBearing(start,newPos));
+                  });
+
+                  valueAnimator.start();
+                  //reach destination
+                  if (index < polyLineList.size() - 2){
+                    handler.postDelayed(this::addJobSeekerMarker, 1500) ;
+                    //Done
+                  } else if (index < polyLineList.size() - 1){
+                    locationAnimation.setRun(false);
+                    //update data
+                    Constants.jobSeekerLocationSubscribe.put(key,locationAnimation);
+                  }
+                }
+              };
+
+              //Run handler
+              handler.postDelayed(runnable,1500);
+
+            } catch (Exception e){
+              Snackbar.make(mapFragment.requireView(), Objects.requireNonNull(e.getMessage()),
+                  Snackbar.LENGTH_SHORT).show();
+            }
+          })
+      );
     }
   }
 }

@@ -12,13 +12,18 @@ import android.os.Build;
 
 import androidx.core.app.NotificationCompat;
 
+import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.Marker;
 import com.wadektech.mraclient.R;
 import com.wadektech.mraclient.models.JobSeekerGeolocation;
+import com.wadektech.mraclient.models.LocationAnimation;
 import com.wadektech.mraclient.models.MraClient;
 
+import java.net.CookieHandler;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 /**
@@ -35,13 +40,15 @@ public class Constants {
   public static MraClient currentUser;
   public static Set<JobSeekerGeolocation> jobSeekerFound = new HashSet<>();
   public static HashMap<String, Marker> markerList = new HashMap<>();
+  public static HashMap<String, LocationAnimation> jobSeekerLocationSubscribe = new HashMap<>();
+
 
   public static String userWelcomeBanner() {
     if (Constants.currentUser != null){
-      return new StringBuilder("Welcome ")
-          .append(Constants.currentUser.getFirstName())
-          .append(" ")
-          .append(Constants.currentUser.getLastName()).toString();
+      return "Welcome " +
+          Constants.currentUser.getFirstName() +
+          " " +
+          Constants.currentUser.getLastName();
     } else {
       return "";
     }
@@ -85,5 +92,53 @@ public class Constants {
 
   public static String buildName(String firstName, String lastName) {
     return firstName + " " + lastName;
+  }
+//Decode poly
+  public static List<LatLng> decodePoly(String polyLine) {
+    List poly = new ArrayList();
+    int index=0,len=polyLine.length();
+    int lat=0,lng=0;
+    while(index < len)
+    {
+      int b,shift=0,result=0;
+      do{
+        b=polyLine.charAt(index++)-63;
+        result |= (b & 0x1f) << shift;
+        shift+=5;
+
+      }while(b >= 0x20);
+      int dlat = ((result & 1) != 0 ? ~(result >> 1):(result >> 1));
+      lat += dlat;
+
+      shift = 0;
+      result = 0;
+      do{
+        b = polyLine.charAt(index++)-63;
+        result |= (b & 0x1f) << shift;
+        shift +=5;
+      }while(b >= 0x20);
+      int dlng = ((result & 1)!=0 ? ~(result >> 1): (result >> 1));
+      lng +=dlng;
+
+      LatLng p = new LatLng((((double)lat / 1E5)),
+          (((double)lng/1E5)));
+      poly.add(p);
+    }
+    return poly;
+  }
+//Get bearing.
+  public static float getBearing(LatLng start, LatLng newPos) {
+    double lat = Math.abs(start.latitude - newPos.latitude);
+    double lng = Math.abs(start.longitude - newPos.longitude);
+
+    if (start.latitude < newPos.latitude && start.longitude < newPos.longitude)
+      return (float) (Math.toDegrees(Math.atan(lng / lat)));
+    else if (start.latitude >= newPos.latitude && start.longitude < newPos.longitude)
+      return (float) ((90 - Math.toDegrees(Math.atan(lng / lat))) + 90);
+    else if (start.latitude >= newPos.latitude && start.longitude >= newPos.longitude)
+      return (float) (Math.toDegrees(Math.atan(lng / lat)) + 180);
+    else if (start.latitude < newPos.latitude && start.longitude >= newPos.longitude)
+      return (float) ((90 - Math.toDegrees(Math.atan(lng / lat))) + 270);
+    return -1;
   }
 }
