@@ -108,13 +108,6 @@ public class HomeFragment extends Fragment implements OnMapReadyCallback, IFireb
   CompositeDisposable compositeDisposable = new CompositeDisposable();
   private IGoogleAPI iGoogleAPI ;
 
-  //moving marker attribs
-  private List<LatLng> polyLineList ;
-  private Handler handler;
-  private int index, next;
-  private LatLng start , end;
-  private float v ;
-  private double lat, lng ;
 
   @Override
   public void onStop() {
@@ -520,50 +513,60 @@ public class HomeFragment extends Fragment implements OnMapReadyCallback, IFireb
                 JSONObject route = jsonArray.getJSONObject(i);
                 JSONObject poly = route.getJSONObject("overview_polyline");
                 String polyLine = poly.getString("points");
-                polyLineList = Constants.decodePoly(polyLine);
+                locationAnimation.setPolyLineList(Constants.decodePoly(polyLine));
               }
-
               //moving
-              handler = new Handler();
-              index = -1 ;
-              next = 1;
+              locationAnimation.setIndex(-1);
+              locationAnimation.setNext(1);
+
               Runnable runnable = () -> {
-                if (polyLineList.size() > 1){
-                  if (index < polyLineList.size() - 2){
-                    index++;
-                    next = index + 1 ;
-                    start = polyLineList.get(index);
-                    end = polyLineList.get(next);
+                if (locationAnimation.getPolyLineList() != null && locationAnimation
+                    .getPolyLineList().size() > 1) {
+                  if (locationAnimation.getIndex() < locationAnimation.getPolyLineList().size() - 2) {
+//                    index++;
+                    locationAnimation.setIndex(locationAnimation.getIndex() + 1);
+                    locationAnimation.setNext(locationAnimation.getNext() + 1);
+//                    start = locationAnimation.getPolyLineList().get(index);
+                    locationAnimation.setStart(locationAnimation.getPolyLineList()
+                        .get(locationAnimation.getIndex()));
+//                    end = locationAnimation.getPolyLineList().get(next);
+                    locationAnimation.setEnd(locationAnimation.getPolyLineList()
+                        .get(locationAnimation.getNext()));
                   }
 
-                  ValueAnimator valueAnimator = ValueAnimator.ofInt(0,1);
+                  ValueAnimator valueAnimator = ValueAnimator.ofInt(0, 1);
                   valueAnimator.setDuration(3000);
                   valueAnimator.setInterpolator(new LinearInterpolator());
                   valueAnimator.addUpdateListener(animation -> {
-                    v = animation.getAnimatedFraction();
-                    lat = v*end.latitude + (1-v) * start.latitude;
-                    lng = v*end.longitude + (1-v) * start.longitude;
-                    LatLng newPos = new LatLng(lat,lng);
+//                    v = animation.getAnimatedFraction();
+                    locationAnimation.setV(valueAnimator.getAnimatedFraction());
+                    locationAnimation.setLat(locationAnimation.getV() * locationAnimation.getEnd()
+                        .latitude + (1 - locationAnimation.getV()) * locationAnimation.getStart().latitude);
+//                    lat = v*end.latitude + (1-v) * start.latitude;
+                    locationAnimation.setLng(locationAnimation.getV() * locationAnimation.getEnd()
+                        .longitude + (1 - locationAnimation.getV()) * locationAnimation.getStart().longitude);
+//                    lng = v*end.longitude + (1-v) * start.longitude;
+                    LatLng newPos = new LatLng(locationAnimation.getLat(), locationAnimation.getLng());
                     marker.setPosition(newPos);
-                    marker.setAnchor(0.5f,0.5f);
-                    marker.setRotation(Constants.getBearing(start,newPos));
+                    marker.setAnchor(0.5f, 0.5f);
+                    marker.setRotation(Constants.getBearing(locationAnimation.getStart(), newPos));
                   });
 
                   valueAnimator.start();
                   //reach destination
-                  if (index < polyLineList.size() - 2){
-                    handler.postDelayed(this::addJobSeekerMarker, 1500) ;
+                  if (locationAnimation.getIndex() < locationAnimation.getPolyLineList().size() - 2) {
+                    locationAnimation.getHandler().postDelayed(HomeFragment.this::addJobSeekerMarker, 1500);
                     //Done
-                  } else if (index < polyLineList.size() - 1){
+                  } else if (locationAnimation.getIndex() < locationAnimation.getPolyLineList().size() - 1) {
                     locationAnimation.setRun(false);
                     //update data
-                    Constants.jobSeekerLocationSubscribe.put(key,locationAnimation);
+                    Constants.jobSeekerLocationSubscribe.put(key, locationAnimation);
                   }
                 }
               };
 
               //Run handler
-              handler.postDelayed(runnable,1500);
+              locationAnimation.getHandler().postDelayed(runnable,1500);
 
             } catch (Exception e){
               Snackbar.make(mapFragment.requireView(), Objects.requireNonNull(e.getMessage()),
