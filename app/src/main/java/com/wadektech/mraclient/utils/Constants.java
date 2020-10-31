@@ -9,6 +9,7 @@ import android.content.Intent;
 import android.graphics.BitmapFactory;
 import android.graphics.Color;
 import android.os.Build;
+import android.widget.TextView;
 
 import androidx.core.app.NotificationCompat;
 
@@ -21,6 +22,7 @@ import com.wadektech.mraclient.models.MraClient;
 
 import java.net.CookieHandler;
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -140,5 +142,15 @@ public class Constants {
     else if (start.latitude < newPos.latitude && start.longitude >= newPos.longitude)
       return (float) ((90 - Math.toDegrees(Math.atan(lng / lat))) + 270);
     return -1;
+  }
+
+  public static void setSlidingPanelWelcomeBanner(TextView mWelcomeBanner) {
+    int hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY);
+    if (hour >= 1 && hour <= 12)
+      mWelcomeBanner.setText(new StringBuilder("Good morning client."));
+    else if (hour >= 13 && hour <= 17)
+      mWelcomeBanner.setText(new StringBuilder("Good afternoon client."));
+    else
+      mWelcomeBanner.setText(new StringBuilder("Good evening client."));
   }
 }

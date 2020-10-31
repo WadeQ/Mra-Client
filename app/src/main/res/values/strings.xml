@@ -31,4 +31,8 @@
     <string name="permission_required">Allow access to location services.</string>
     <string name="job_seeker_not_found">No Job Seeker found, try requesting again!</string>
     <string name="no_job_seeker_with_key">No job seeker with available keys found.</string>
+    <string name="welcome_banner">Good Afternoon Client!</string>
+    <string name="choose_a_place">Choose a saved location</string>
+    <string name="where_to">Where is job located?</string>
+    <string name="city_name_empty_exception">City not found!</string>
 </resources>
