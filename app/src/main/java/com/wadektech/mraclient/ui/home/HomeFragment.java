@@ -33,6 +33,7 @@ import com.firebase.geofire.GeoFire;
 import com.firebase.geofire.GeoLocation;
 import com.firebase.geofire.GeoQuery;
 import com.firebase.geofire.GeoQueryEventListener;
+import com.google.android.gms.common.api.Status;
 import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationCallback;
 import com.google.android.gms.location.LocationRequest;
@@ -49,6 +50,11 @@ import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.android.gms.tasks.OnFailureListener;
 import com.google.android.gms.tasks.OnSuccessListener;
+import com.google.android.libraries.places.api.Places;
+import com.google.android.libraries.places.api.model.Place;
+import com.google.android.libraries.places.widget.AutocompleteFragment;
+import com.google.android.libraries.places.widget.AutocompleteSupportFragment;
+import com.google.android.libraries.places.widget.listener.PlaceSelectionListener;
 import com.google.android.material.snackbar.Snackbar;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.database.ChildEventListener;
@@ -63,6 +69,7 @@ import com.karumi.dexter.listener.PermissionDeniedResponse;
 import com.karumi.dexter.listener.PermissionGrantedResponse;
 import com.karumi.dexter.listener.PermissionRequest;
 import com.karumi.dexter.listener.single.PermissionListener;
+import com.sothree.slidinguppanel.SlidingUpPanelLayout;
 import com.wadektech.mraclient.R;
 import com.wadektech.mraclient.callbacks.IFirebaseFailedListener;
 import com.wadektech.mraclient.callbacks.IFirebaseJobSeekerInfoListener;
@@ -78,10 +85,13 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 
+import butterknife.BindView;
+import butterknife.ButterKnife;
 import io.reactivex.Observable;
 import io.reactivex.Scheduler;
 import io.reactivex.android.schedulers.AndroidSchedulers;
@@ -107,6 +117,12 @@ public class HomeFragment extends Fragment implements OnMapReadyCallback, IFireb
   boolean firstTime = true;
   CompositeDisposable compositeDisposable = new CompositeDisposable();
   private IGoogleAPI iGoogleAPI ;
+
+  @BindView(R.id.activity_main)
+  SlidingUpPanelLayout slidingUpPanelLayout;
+  @BindView(R.id.tv_welcome_banner)
+  TextView mWelcomeBanner ;
+  private AutocompleteSupportFragment autocompleteSupportFragment;
 
 
   @Override
@@ -140,17 +156,44 @@ public class HomeFragment extends Fragment implements OnMapReadyCallback, IFireb
     assert mapFragment != null;
     mapFragment.getMapAsync(this);
     initLocation();
+    initSlidingPanelView(root);
     return root;
 
   }
 
+  private void initSlidingPanelView(View root) {
+    ButterKnife.bind(this,root);
+    Constants.setSlidingPanelWelcomeBanner(mWelcomeBanner);
+  }
+
   @SuppressLint("MissingPermission")
   private void initLocation() {
+    Places.initialize(getContext(), getString(R.string.google_maps_key));
+    autocompleteSupportFragment = (AutocompleteSupportFragment) getChildFragmentManager()
+        .findFragmentById(R.id.autocomplete_fragment);
+        autocompleteSupportFragment.setPlaceFields(Arrays.asList(Place.Field.ID,
+            Place.Field.ADDRESS, Place.Field.NAME,Place.Field.LAT_LNG));
+        autocompleteSupportFragment.setHint(getString(R.string.where_to));
+        autocompleteSupportFragment.setOnPlaceSelectedListener(new PlaceSelectionListener() {
+          @Override
+          public void onPlaceSelected(@NonNull Place place) {
+            Snackbar.make(mapFragment.requireView(), ""+place.getLatLng(),Snackbar.LENGTH_LONG).show();
+          }
+
+          @Override
+          public void onError(@NonNull Status status) {
+            Snackbar.make(mapFragment.requireView(), ""+status.getStatusMessage()
+                ,Snackbar.LENGTH_LONG).show();
+          }
+        });
+
     iGoogleAPI = RetrofitClient.getInstance().create(IGoogleAPI.class);
+
     iFirebaseFailedListener = this;
     iFirebaseJobSeekerInfoListener = this;
     onlineStatusRef = FirebaseDatabase.getInstance().getReference().child(".info/connected");
-    jobSeekerLocationRef = FirebaseDatabase.getInstance().getReference(Constants.MRA_CLIENT_LOCATION_REFERENCE);
+    jobSeekerLocationRef = FirebaseDatabase.getInstance()
+        .getReference(Constants.MRA_CLIENT_LOCATION_REFERENCE);
     userRef = FirebaseDatabase.getInstance().getReference(Constants.MRA_CLIENT_LOCATION_REFERENCE)
         .child(Objects.requireNonNull(FirebaseAuth.getInstance().getCurrentUser()).getUid());
     geoFire = new GeoFire(jobSeekerLocationRef);
@@ -176,6 +219,8 @@ public class HomeFragment extends Fragment implements OnMapReadyCallback, IFireb
         if (firstTime) {
           previousLocation = currentLocation = locationResult.getLastLocation();
           firstTime = false;
+
+          setRestrictedPlacesInCountry(locationResult.getLastLocation());
         } else {
           previousLocation = currentLocation;
           currentLocation = locationResult.getLastLocation();
@@ -204,6 +249,18 @@ public class HomeFragment extends Fragment implements OnMapReadyCallback, IFireb
     loadAvailableJobSeekers();
   }
 
+  private void setRestrictedPlacesInCountry(Location lastLocation) {
+    try {
+      Geocoder geocoder = new Geocoder(getContext(), Locale.getDefault());
+      List<Address> addressList = geocoder.getFromLocation(lastLocation.getLatitude(),
+          lastLocation.getLongitude(), 1);
+      if (addressList.size() > 0)
+          autocompleteSupportFragment.setCountry(addressList.get(0).getCountryCode());
+    }  catch (IOException e) {
+         e.printStackTrace();
+    }
+  }
+
   private void loadAvailableJobSeekers() {
     if (ActivityCompat.checkSelfPermission(requireContext(), Manifest.permission.ACCESS_FINE_LOCATION)
         != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(requireContext(),
@@ -219,89 +276,94 @@ public class HomeFragment extends Fragment implements OnMapReadyCallback, IFireb
           Geocoder geocoder = new Geocoder(getContext(), Locale.getDefault());
           List<Address> addressList ;
           try {
-            addressList = geocoder.getFromLocation(location.getLatitude(), location.getLongitude(),1);
-            cityName = addressList.get(0).getLocality();
-
-            DatabaseReference dbRef = FirebaseDatabase
-                .getInstance()
-                .getReference(Constants.JOB_SEEKER_LOCATION_REFERENCE)
-                .child(cityName);
-            GeoFire geoFire = new GeoFire(dbRef);
-            GeoQuery geoQuery = geoFire.queryAtLocation(new GeoLocation(location.getLatitude(),
-                location.getLongitude()),distance);
-            geoQuery.removeAllListeners();
-            geoQuery.addGeoQueryEventListener(new GeoQueryEventListener() {
-              @Override
-              public void onKeyEntered(String key, GeoLocation location) {
-                Constants.jobSeekerFound.add(new JobSeekerGeolocation(key,location));
-              }
-
-              @Override
-              public void onKeyExited(String key) {
-
-              }
-
-              @Override
-              public void onKeyMoved(String key, GeoLocation location) {
-
-              }
-
-              @Override
-              public void onGeoQueryReady() {
-                if (distance <= LIMIT_RANGE){
-                  distance++;
-                  //no job seekers around, search further
-                  loadAvailableJobSeekers();
-                } else{
-                  //reset the distance value to default
-                  distance = 1.0;
-                  addJobSeekerMarker();
+            addressList = geocoder.getFromLocation(location.getLatitude(),
+                location.getLongitude(),1);
+            if (addressList.size() > 0)
+                cityName = addressList.get(0).getLocality();
+            if (!TextUtils.isEmpty(cityName)) {
+              DatabaseReference dbRef = FirebaseDatabase
+                  .getInstance()
+                  .getReference(Constants.JOB_SEEKER_LOCATION_REFERENCE)
+                  .child(cityName);
+              GeoFire geoFire = new GeoFire(dbRef);
+              GeoQuery geoQuery = geoFire.queryAtLocation(new GeoLocation(location.getLatitude(),
+                  location.getLongitude()), distance);
+              geoQuery.removeAllListeners();
+              geoQuery.addGeoQueryEventListener(new GeoQueryEventListener() {
+                @Override
+                public void onKeyEntered(String key, GeoLocation location) {
+                  Constants.jobSeekerFound.add(new JobSeekerGeolocation(key, location));
                 }
-              }
 
-              @Override
-              public void onGeoQueryError(DatabaseError error) {
-                Snackbar.make(requireView(), "Error "+error.getMessage(), Snackbar.LENGTH_SHORT).show();
-              }
-            });
+                @Override
+                public void onKeyExited(String key) {
 
-            dbRef.addChildEventListener(new ChildEventListener() {
-              @Override
-              public void onChildAdded(@NonNull DataSnapshot snapshot, @Nullable String previousChildName) {
-                GeoQueryClass geoQueryClass = snapshot.getValue(GeoQueryClass.class);
-                assert geoQueryClass != null;
-                GeoLocation geoLocation = new GeoLocation(geoQueryClass.getArrayList().get(0),
-                    geoQueryClass.getArrayList().get(1));
-                JobSeekerGeolocation jobSeekerGeolocation = new JobSeekerGeolocation(snapshot.getKey(),
-                    geoLocation);
-                Location loc = new Location("");
-                loc.setLatitude(geoLocation.latitude);
-                loc.setLongitude(geoLocation.longitude);
-                float currDistance = location.distanceTo(loc)/1000;
-                if (currDistance <= LIMIT_RANGE)
-                  findJobSeekerByKey(jobSeekerGeolocation);
-              }
+                }
 
-              @Override
-              public void onChildChanged(@NonNull DataSnapshot snapshot, @Nullable String previousChildName) {
+                @Override
+                public void onKeyMoved(String key, GeoLocation location) {
 
-              }
+                }
 
-              @Override
-              public void onChildRemoved(@NonNull DataSnapshot snapshot) {
+                @Override
+                public void onGeoQueryReady() {
+                  if (distance <= LIMIT_RANGE) {
+                    distance++;
+                    //no job seekers around, search further
+                    loadAvailableJobSeekers();
+                  } else {
+                    //reset the distance value to default
+                    distance = 1.0;
+                    addJobSeekerMarker();
+                  }
+                }
 
-              }
+                @Override
+                public void onGeoQueryError(DatabaseError error) {
+                  Snackbar.make(requireView(), "Error " + error.getMessage(), Snackbar.LENGTH_SHORT).show();
+                }
+              });
 
-              @Override
-              public void onChildMoved(@NonNull DataSnapshot snapshot, @Nullable String previousChildName) {
+              dbRef.addChildEventListener(new ChildEventListener() {
+                @Override
+                public void onChildAdded(@NonNull DataSnapshot snapshot, @Nullable String previousChildName) {
+                  GeoQueryClass geoQueryClass = snapshot.getValue(GeoQueryClass.class);
+                  assert geoQueryClass != null;
+                  GeoLocation geoLocation = new GeoLocation(geoQueryClass.getArrayList().get(0),
+                      geoQueryClass.getArrayList().get(1));
+                  JobSeekerGeolocation jobSeekerGeolocation = new JobSeekerGeolocation(snapshot.getKey(),
+                      geoLocation);
+                  Location loc = new Location("");
+                  loc.setLatitude(geoLocation.latitude);
+                  loc.setLongitude(geoLocation.longitude);
+                  float currDistance = location.distanceTo(loc) / 1000;
+                  if (currDistance <= LIMIT_RANGE)
+                    findJobSeekerByKey(jobSeekerGeolocation);
+                }
 
-              }
+                @Override
+                public void onChildChanged(@NonNull DataSnapshot snapshot, @Nullable String previousChildName) {
 
-              @Override
-              public void onCancelled(@NonNull DatabaseError error) {
+                }
 
-              }
-            });
+                @Override
+                public void onChildRemoved(@NonNull DataSnapshot snapshot) {
+
+                }
+
+                @Override
+                public void onChildMoved(@NonNull DataSnapshot snapshot, @Nullable String previousChildName) {
+
+                }
+
+                @Override
+                public void onCancelled(@NonNull DatabaseError error) {
+
+                }
+              });
+            } else
+              Snackbar.make(mapFragment.requireView(), getString(R.string.city_name_empty_exception),
+                  Snackbar.LENGTH_LONG).show();
           } catch (IOException e) {
             Snackbar.make(requireView(), "Error "+e.getMessage(), Snackbar.LENGTH_SHORT).show();
           }
